@@ -1,0 +1,142 @@
+/* static/css/chat.css */
+
+/* حاوية الشات */
+.chat-card {
+    height: 80vh; 
+    display: flex; 
+    flex-direction: column; 
+    padding: 0;
+}
+
+/* الهيدر */
+.chat-header {
+    padding: 15px; 
+    border-bottom: 1px solid #ddd; 
+    background: #f8f9fa; 
+    border-radius: 12px 12px 0 0; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center;
+}
+
+.status-dot {
+    font-size: 0.8em; 
+    color: green; 
+    display: block;
+}
+
+/* منطقة الرسائل - ضروري جداً أن تكون flex و column لكي تعمل المحاذاة */
+#chat-log {
+    flex: 1; 
+    overflow-y: auto; 
+    padding: 15px; 
+    display: flex;           /* مهم */
+    flex-direction: column;  /* مهم */
+    gap: 10px;
+}
+
+/* الرسالة الفردية */
+.message {
+    max-width: 75%;
+    padding: 10px 15px;
+    border-radius: 15px;
+    position: relative;
+    word-wrap: break-word;
+}
+
+/* رسائلي (يمين) - التصحيح هنا */
+.message.sent {
+    align-self: flex-start; /* استخدام (-) وليس (_) */
+    background-color: #0d6efd;
+    color: white;
+    border-bottom-right-radius: 2px;
+}
+
+/* رسائل الطرف الآخر (يسار) - التصحيح هنا */
+.message.received {
+    align-self: flex-end;   /* استخدام (-) وليس (_) */
+    background-color: #e9ecef;
+    color: black;
+    border-bottom-left-radius: 2px;
+}
+
+.time {
+    display: block;
+    font-size: 0.7em;
+    margin-top: 5px;
+    opacity: 0.7;
+    text-align: right; /* الوقت دائماً يمين الرسالة */
+}
+
+/* منطقة الكتابة */
+.chat-input-area {
+    padding: 15px; 
+    border-top: 1px solid #ddd; 
+    background: #fff; 
+    display: flex; 
+    gap: 10px;
+}
+
+#chat-message-input {
+    flex: 1; 
+    padding: 10px; 
+    border-radius: 20px; 
+    border: 1px solid #ccc;
+}
+
+#chat-message-submit {
+    margin: 0; 
+    width: auto; 
+    padding: 0 20px; 
+    border-radius: 20px;
+}
+
+
+/* --- إضافات الصور الطبية --- */
+
+/* زر رفع الصور */
+#image-btn {
+    background-color: #8cbee9;
+    color: white;
+    width: auto;
+    padding: 0 15px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    margin-right: 5px;
+}
+
+#image-btn:hover {
+    background-color: #158ce7;
+}
+
+/* تنسيق الصورة (واضحة تماماً الآن) */
+.chat-image {
+    max-width: 100%;
+    max-height: 300px;
+    border-radius: 8px;
+    margin-top: 5px;
+    cursor: pointer;
+    /* تم حذف filter: blur */
+    border: 1px solid #ddd; /* إطار خفيف لجمالية الصورة */
+}
+
+
+
+
+/* تنسيق اسم المرسل (Nurse) داخل الفقاعة */
+.sender-label {
+    display: block;
+    font-size: 0.75rem; /* خط صغير */
+    font-weight: bold;
+    color: #0d6efd; /* لون أزرق مميز */
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* في حالة الرسائل القادمة (الرمادية)، نغير لون النص ليكون واضحاً */
+.message.received .sender-label {
+    color: #555; 
+}

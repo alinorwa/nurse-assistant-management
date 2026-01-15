@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %} Conversation with the nurse{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'css/chat.css' %}">
+
+<div class="card chat-card">
+    
+    <div class="chat-header">
+        <div>
+            <strong>Conversation with the nurse</strong>
+            <span class="status-dot">● connected</span>
+        </div>
+        
+        <form action="{% url 'logout' %}" method="post" style="margin: 0;">
+            {% csrf_token %}
+            <button type="submit" style="background: none; border: 1px solid #dc3545; color: #dc3545; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 0.8em;">
+                Logout
+            </button>
+        </form>
+    </div>
+
+    <!-- منطقة الرسائل -->
+    <div id="chat-log">
+        {% for message in chat_messages %}
+            <!-- نستخدم message.id لربط الـ div بنفس الـ ID القادم من الجافاسكريبت -->
+            <div id="msg-{{ message.id }}" class="message {% if message.sender == user %}sent{% else %}received{% endif %}">
+
+                <!-- إضافة كلمة Nurse لرسائل الممرض -->
+                {% if message.sender != user %}
+                    <span class="sender-label">Nurse 👩‍⚕️</span>
+                {% endif %}
+                
+                <!-- فحص: هل الرسالة صورة أم نص؟ -->
+                {% if message.image %}
+                    <!-- الصورة تظهر واضحة -->
+                    <a href="{{ message.image.url }}" target="_blank">
+                        <img src="{{ message.image.url }}" class="chat-image">
+                    </a>
+                {% else %}
+                    <!-- عرض النص -->
+                    {% if message.sender == user %}
+                        {{ message.text_original }}
+                    {% else %}
+                        {{ message.text_translated|default:message.text_original }}
+                    {% endif %}
+                {% endif %}
+
+                <span class="time">{{ message.timestamp|date:"H:i" }}</span>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- شريط الخطأ (للتنبيه عند سرعة الإرسال) -->
+    <div id="error-banner" style="display: none; background-color: #ffebee; color: #c62828; padding: 10px; text-align: center; border-top: 1px solid #ef9a9a; font-size: 0.9em; font-weight: bold;"></div>
+
+    <!-- منطقة الكتابة (تم تعديلها لعرض رسالة الخصوصية) -->
+    <div class="chat-input-area" style="flex-direction: column; gap: 0;">
+        
+        <!-- الصف العلوي: الأزرار وحقل الكتابة -->
+        <div style="display: flex; width: 100%; gap: 10px; margin-bottom: 5px;">
+            <input type="file" id="image-input" accept="image/*" style="display: none;">
+            <button id="image-btn" title="Send image">📎</button>
+
+            <input id="chat-message-input" type="text" placeholder="Write your message here..." style="flex: 1; padding: 10px; border-radius: 20px; border: 1px solid #ccc;">
+            <button id="chat-message-submit" class="btn-primary" style="margin: 0; padding: 0 20px; border-radius: 20px;">➤</button>
+        </div>
+
+        <!-- الصف السفلي: رسالة الخصوصية المتغيرة حسب اللغة -->
+        <div style="text-align: center; font-size: 0.75rem; color: #eb6d07; padding-bottom: 5px;">
+            {{ privacy_warning }}
+        </div>
+    </div>
+</div>
+
+<script src="{% static 'js/chat.js' %}"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initChat({
+            sessionId: "{{ session.id }}",
+            // ملاحظة: إذا كان User ID عبارة عن UUID، يفضل إزالة parseInt واستخدام التنصيص فقط "{{ user.id }}"
+            // لكن إذا كان رقماً (Integer) كما هو الافتراضي، فالكود الحالي صحيح.
+            userId: parseInt("{{ user.id }}"),
+            
+            // تمرير توكن الحماية ورابط الرفع للـ JS
+            csrfToken: "{{ csrf_token }}",
+            uploadUrl: "{% url 'chat_upload_image' %}"
+        });
+    });
+</script>
+
+{% endblock %}

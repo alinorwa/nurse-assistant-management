@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %} New registration{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Register a new patient</h2>
+    
+    <form method="post" novalidate>
+        {% csrf_token %}
+        
+        <!-- عرض الأخطاء العامة -->
+        {% if form.non_field_errors %}
+            <ul class="error-list">
+                {% for error in form.non_field_errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <!-- حلقة تكرارية لعرض الحقول -->
+        {% for field in form %}
+            <div class="form-group">
+                <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                
+                {{ field }}
+                
+                {% if field.help_text %}
+                    <div class="help-text">{{ field.help_text }}</div>
+                {% endif %}
+
+                {% if field.errors %}
+                    <div class="error-list" style="margin-top: 5px; padding: 5px;">
+                        {{ field.errors.0 }}
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
+
+        <button type="submit" class="btn-primary">Register</button>
+    </form>
+
+   
+    <a href="{% url 'login' %}" class="auth-link">Already have an account? Log in</a>
+</div>
+{% endblock %}
