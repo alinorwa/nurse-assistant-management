@@ -42,4 +42,3 @@ django-unfold
 
 celery>=5.3.6
 
-django-ninja>=1.1.0

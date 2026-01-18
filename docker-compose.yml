@@ -1,4 +1,16 @@
 services:
+  # خدمة قاعدة البيانات (الجديدة)
+  db:
+    image: postgres:16-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=camp_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432" # لكي تستطيع الوصول لها من pgAdmin إذا أردت
+
   web:
     build:
       context: .
@@ -10,11 +22,11 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - POSTGRES_HOST=db # يشير لخدمة الـ db أعلاه
     depends_on:
-      - redis # حذفنا db من هنا لأن القاعدة خارجية
-    # ضروري جداً لكي يرى السيرفر قاعدة البيانات على جهازك
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - db
+      - redis
 
   celery:
     build:
@@ -25,13 +37,16 @@ services:
       - .:/app
     env_file:
       - .env
+    environment:
+      - POSTGRES_HOST=db
     depends_on:
-      - redis # حذفنا db من هنا أيضاً
-    # ضروري لكي يرى الـ Worker قاعدة البيانات
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - db
+      - redis
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+
+volumes:
+  postgres_data:

@@ -9,32 +9,37 @@ from unfold.admin import ModelAdmin, TabularInline
 class DangerKeywordAdmin(ModelAdmin):
     list_display = ('word', 'is_active')
     search_fields = ('word',)
-    help_text = "Det farlige ordet (norsk)"
+    help_text = "أضف الكلمات النرويجية الخطرة."
 
 class MessageInline(TabularInline):
     model = Message
     extra = 1
     tab = True
     
-    # الترتيب الجديد:
-    # 1. المرسل
-    # 2. المحتوى الذكي (يجمع النص المترجم + الصورة + التحليل)
-    # 3. الحالة والوقت
-    # 4. الحقول الأصلية (text_original, image) موجودة هنا لكي تظهر في سطر الإضافة الجديد فقط، وسيتم إخفاؤها من الرسائل القديمة بالـ CSS
     fields = ('sender_display', 'smart_content_display', 'status_and_time', 'text_original', 'image')
-    
-    # نجعل الحقول المجمعة للقراءة فقط
     readonly_fields = ('sender_display', 'smart_content_display', 'status_and_time')
 
-    # --- 1. العمود الأوسط: المحتوى الذكي (Clean & Combined) ---
+    # --- 1. العمود الأوسط: المحتوى الذكي (نسخة نظيفة جداً) ---
     def smart_content_display(self, obj):
         content_parts = []
         
-        # أ) النصوص: عرض الترجمة فقط للاجئ، والأصلي للممرض
+        # قائمة النصوص التي نريد إخفاءها لأنها مجرد تنبيهات للنظام
+        IGNORED_TEXTS = [
+            "[Image Sent]", 
+            "[Image from App]", 
+            "[bilde sendt]", 
+            "[Image Sent from App]",
+            ""
+        ]
+
+        # أ) النصوص
         if obj.sender_id:
-            # إذا كان لاجئاً -> نعرض الترجمة النرويجية
+            # للاجئ: نعرض الترجمة
             if obj.sender.role == 'REFUGEE':
-                if obj.text_translated:
+                text_to_show = obj.text_translated.strip() if obj.text_translated else ""
+                
+                # الشرط الجديد: نعرض النص فقط إذا لم يكن في قائمة التجاهل
+                if text_to_show and text_to_show not in IGNORED_TEXTS:
                     part = format_html(
                         '''
                         <div style="background-color: #eff6ff; padding: 12px; border-radius: 8px; border-left: 5px solid #3b82f6; color: #1e3a8a; margin-bottom: 10px; font-size: 1rem;">
@@ -42,26 +47,27 @@ class MessageInline(TabularInline):
                             {}
                         </div>
                         ''',
-                        obj.text_translated
+                        text_to_show
                     )
                     content_parts.append(part)
             
-            # إذا كان ممرضاً -> نعرض النص الأصلي (لأنه يكتب بالنرويجي)
+            # للممرض: نعرض النص الأصلي
             else:
-                if obj.text_original:
+                text_to_show = obj.text_original.strip() if obj.text_original else ""
+                
+                if text_to_show and text_to_show not in IGNORED_TEXTS:
                     part = format_html(
                         '''
                         <div style="background-color: #f3f4f6; padding: 12px; border-radius: 8px; color: #374151; margin-bottom: 10px;">
                             {}
                         </div>
                         ''',
-                        obj.text_original
+                        text_to_show
                     )
                     content_parts.append(part)
 
-        # ب) الصور (أو البديل إذا لم توجد)
+        # ب) الصور
         if obj.image:
-            # عرض الصورة الحقيقية (بدون مربعات اختيار أو حذف)
             part = format_html(
                 '''
                 <div style="margin-top: 5px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 5px; background: white; width: fit-content;">
@@ -75,26 +81,8 @@ class MessageInline(TabularInline):
                 url=obj.image.url
             )
             content_parts.append(part)
-        elif obj.pk: 
-            # عرض المربع البديل (فقط للرسائل المحفوظة)
-            part = mark_safe(
-                '''
-                <div style="
-                    margin-top: 5px; 
-                    background-color: #f9fafb; 
-                    border: 2px dashed #d1d5db; 
-                    border-radius: 8px; 
-                    padding: 10px 20px; 
-                    text-align: center; 
-                    color: #9ca3af;
-                    font-size: 0.8rem;
-                    width: fit-content;
-                ">
-                    📷 Ingen bilde / No Image
-                </div>
-                '''
-            )
-            content_parts.append(part)
+        
+        # 🛑 تم حذف (elif obj.pk) بالكامل لإزالة مربع "No Image"
 
         # ج) الذكاء الاصطناعي
         if obj.ai_analysis:
@@ -109,12 +97,11 @@ class MessageInline(TabularInline):
             )
             content_parts.append(part)
 
-        # دمج الأجزاء بأمان
         return mark_safe("".join(p for p in content_parts))
     
     smart_content_display.short_description = "Content / Innhold"
 
-    # --- 2. العمود الأيمن: الحالة والتاريخ ---
+    # --- 2. العمود الأيمن ---
     def status_and_time(self, obj):
         if not obj.pk: return "-"
         
@@ -153,7 +140,7 @@ class MessageInline(TabularInline):
         )
     status_and_time.short_description = "Status"
 
-    # --- 3. العمود الأيسر: المرسل ---
+    # --- 3. العمود الأيسر ---
     def sender_display(self, obj):
         if not obj.sender_id: return "-"
         role_color = "#3b82f6" if obj.sender.role == "NURSE" else "#10b981"
@@ -174,7 +161,6 @@ class MessageInline(TabularInline):
 
     list_fullwidth = True
     
-    # نربط ملف CSS لإخفاء الحقول المكررة في الرسائل القديمة
     class Media:
         css = {
             'all': ('css/admin_chat_clean.css',) 
@@ -197,7 +183,7 @@ class ChatSessionAdmin(ModelAdmin):
 
     def refugee_info(self, obj):
         return f"{obj.refugee.full_name} ({obj.refugee.get_native_language_display()})"
-    refugee_info.short_description = "Refugee Name & Lang"
+    refugee_info.short_description = "Refugee"
 
     def priority_flag(self, obj):
         if obj.priority == 2: 
@@ -247,16 +233,6 @@ class ChatSessionAdmin(ModelAdmin):
                 room_group_name,
                 message_data
             )
-    class Media:
-        css = {
-            'all': ('css/admin_chat_clean.css',) # الملف القديم للتصميم
-        }
-        js = (
-            'js/admin_realtime.js', # الملف الجديد للتحديث
-        )    
-
-
-
 
 @admin.register(TranslationCache)
 class TranslationCacheAdmin(ModelAdmin):

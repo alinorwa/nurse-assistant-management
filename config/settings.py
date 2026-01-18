@@ -14,50 +14,49 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 Django settings for config project.
 Refactored for High Security (Django 6) & Docker Environment.
 """
+"""
+Django settings for config project.
+Standard Production-Ready Configuration (Web Only).
+"""
 
 import os
 from pathlib import Path
-import environ # مكتبة django-environ
+import environ
 from datetime import timedelta
 from django.templatetags.static import static
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 
-# 1. تهيئة البيئة
 env = environ.Env()
-# قراءة ملف .env (تأكد من وجوده)
 environ.Env.read_env(os.path.join(Path(__file__).resolve().parent.parent, '.env'))
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ==============================================================================
-# 🛡️ CORE SECURITY SETTINGS
+# 🛡️ CORE SECURITY
 # ==============================================================================
 
-# تحذير: يجب أن يكون False في السيرفر الحقيقي
-DEBUG = env.bool('DJANGO_DEBUG', False) 
-
-SECRET_KEY = env('DJANGO_SECRET_KEY', default='unsafe-secret-key-change-it')
-
-# مفتاح التشفير (مهم جداً للبيانات الطبية)
+DEBUG = env.bool('DJANGO_DEBUG', False)
+SECRET_KEY = env('DJANGO_SECRET_KEY', default='unsafe-secret-key')
 DB_ENCRYPTION_KEY = env('DB_ENCRYPTION_KEY', default='sEcret_Key_Must_Be_32_UrlSafe_Base64=')
 
-# تحديد الهوست المسموح به (في السيرفر الداخلي ضع IP السيرفر والدومين)
-ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['localhost', '127.0.0.1', 'host.docker.internal'])
-
+# السماح بالدومينات المحددة في البيئة (مهم للإنترنت)
+ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
 # ==============================================================================
 # 🧩 APPS & MIDDLEWARE
 # ==============================================================================
 
 INSTALLED_APPS = [
-    'daphne', # ASGI Server (يجب أن يكون الأول)
-    # --- أضف تطبيقات التصميم هنا في البداية ---
-    "unfold",              # الأساس
-    "unfold.contrib.filters", # فلاتر جميلة
-    "unfold.contrib.forms",   # نماذج جميلة
-    "unfold.contrib.import_export", # (اختياري)
+    'daphne',
+    
+    # UI
+    "unfold",
+    "unfold.contrib.filters",
+    "unfold.contrib.forms",
+    "unfold.contrib.import_export",
 
+    # Django
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -66,26 +65,41 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     
     # Third Party
-    'channels', # WebSockets
-    'csp',      # Content Security Policy (XSS Protection)
-    'axes',     # Brute Force Protection
+    'channels',
+    'csp',
+    'axes',
+    # تم حذف ninja و corsheaders
     
     # Local Apps
     'apps.accounts',
     'apps.chat',
     'apps.core',
-    "ninja",
 ]
 
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / 'templates'], # تأكد أن هذا المجلد موجود
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ],
+        },
+    },
+]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware", # (1) خدمة الستاتيك في الدوكر
-    "csp.middleware.CSPMiddleware",               # (2) حماية المحتوى
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "csp.middleware.CSPMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "axes.middleware.AxesMiddleware",             # (3) حماية الدخول
+    "axes.middleware.AxesMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -95,29 +109,34 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = 'config.asgi.application'
 
 
+
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = 'Europe/Oslo'
+USE_I18N = True
+USE_TZ = True
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/auth/login/'
+
 # ==============================================================================
-# 🗄️ DATABASE & CACHE
+# 🗄️ DATABASE (Standard Docker/Cloud Setup)
 # ==============================================================================
 
-# الاتصال بـ PostgreSQL على جهاز الويندوز (Host)
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'camp_medical_db',
         'USER': 'postgres',
-        # (هام) نقرأ الباسورد من البيئة للامان
         'PASSWORD': env('DB_PASSWORD', default='123'), 
         'HOST': 'host.docker.internal',
         'PORT': '5432',
     }
 }
 
-# إعداد Redis (للشات والكاش)
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("redis", 6379)],
+            "hosts": [(env('REDIS_HOST', default='redis'), 6379)],
         },
     },
 }
@@ -125,63 +144,52 @@ CHANNEL_LAYERS = {
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://redis:6379/1",
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-        }
+        "LOCATION": f"redis://{env('REDIS_HOST', default='redis')}:6379/1",
+        "OPTIONS": {"CLIENT_CLASS": "django_redis.client.DefaultClient"}
     }
 }
 
-
 # ==============================================================================
-# 🔒 PASSWORD & AUTHENTICATION
+# 🔒 AUTH & SECURITY
 # ==============================================================================
 
 AUTH_USER_MODEL = 'accounts.User'
 
 AUTHENTICATION_BACKENDS = [
-    'axes.backends.AxesStandaloneBackend', # يراقب المحاولات الفاشلة
+    'axes.backends.AxesStandaloneBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
-AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
-]
-
-# إعدادات الحماية من التخمين
 AXES_FAILURE_LIMIT = 5          
-# AXES_COOLOFF_TIME = 1   
-AXES_COOLOFF_TIME = timedelta(minutes=1)        
+AXES_COOLOFF_TIME = timedelta(minutes=10)     
 AXES_RESET_ON_SUCCESS = True    
-
-# --- الإضافة الجديدة: تحديد قالب الحظر ---
 AXES_LOCKOUT_TEMPLATE = 'accounts/lockout.html'
-
-# نستخدم دالتنا الخاصة لتجنب مشاكل الإصدارات والتحذيرات
 AXES_CLIENT_IP_CALLABLE = 'apps.core.utils.get_client_ip'
 
 # ==============================================================================
-# 🌐 INTERNATIONALIZATION & AZURE
+# 🧠 AI SERVICES
 # ==============================================================================
-
-LANGUAGE_CODE = "en-us"
-TIME_ZONE = 'Europe/Oslo'
-USE_I18N = True
-USE_TZ = True
-
-# Azure Config
 AZURE_TRANSLATOR_KEY = env('AZURE_TRANSLATOR_KEY')
 AZURE_TRANSLATOR_ENDPOINT = env('AZURE_TRANSLATOR_ENDPOINT')
 AZURE_TRANSLATOR_REGION = env('AZURE_TRANSLATOR_REGION')
 
+AZURE_OPENAI_ENDPOINT = env('AZURE_OPENAI_ENDPOINT')
+AZURE_OPENAI_KEY = env('AZURE_OPENAI_KEY')
+AZURE_OPENAI_DEPLOYMENT_NAME = env('AZURE_OPENAI_DEPLOYMENT_NAME', default='gpt-4o')
 
 # ==============================================================================
-# 🎨 STATIC FILES (WHITE NOISE CONFIG)
+# 🐇 CELERY
 # ==============================================================================
+CELERY_BROKER_URL = f"redis://{env('REDIS_HOST', default='redis')}:6379/0"
+CELERY_RESULT_BACKEND = f"redis://{env('REDIS_HOST', default='redis')}:6379/0"
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
 
+# ==============================================================================
+# 🎨 STATIC & MEDIA
+# ==============================================================================
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
@@ -189,117 +197,43 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-
-# إعداد التخزين الحديث (Django 5/6 Standard)
 STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    "staticfiles": {
-        # استخدام WhiteNoise لضغط الملفات وخدمتها بسرعة
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 
-
 # ==============================================================================
-# 🚧 REDIRECTS
-# ==============================================================================
-
-LOGIN_REDIRECT_URL = '/'
-LOGOUT_REDIRECT_URL = '/auth/login/'
-
-
-# ==============================================================================
-# 🛡️ SECURITY HARDENING (PRODUCTION)
+# 👮 CSP & Security (Production Ready)
 # ==============================================================================
 
-if not DEBUG:
-    # 1. HTTPS Settings (تشفير الاتصال)
-    # ملاحظة: فعل هذه الخيارات فقط إذا كان السيرفر يدعم HTTPS (شهادة SSL)
-    # وإلا سيتوقف الموقع عن العمل وتضطر لإعادتها False
-    SECURE_SSL_REDIRECT = False # اجعلها True عند تركيب الشهادة
-    SESSION_COOKIE_SECURE = False # اجعلها True مع HTTPS
-    CSRF_COOKIE_SECURE = False    # اجعلها True مع HTTPS
-    
-    # 2. HSTS (يجبر المتصفح على الأمان)
-    SECURE_HSTS_SECONDS = 0
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
-    SECURE_HSTS_PRELOAD = False
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-
-# حماية الكوكيز (تعمل دائماً)
-SESSION_COOKIE_HTTPONLY = True
-CSRF_COOKIE_HTTPONLY = True
-
-# حماية المتصفح
-X_FRAME_OPTIONS = 'DENY'
-SECURE_CONTENT_TYPE_NOSNIFF = True
-SECURE_BROWSER_XSS_FILTER = True
-
-
-# ==============================================================================
-# 👮 CSP CONFIGURATION (Content Security Policy)
-# ==============================================================================
+# تنظيف المصادر الموثوقة (فقط الدومين الخاص بنا)
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=["http://localhost:8000", "http://127.0.0.1:8000"])
 
 CONTENT_SECURITY_POLICY = {
     "DIRECTIVES": {
         "default-src": ["'self'"],
         "script-src": ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-        
-        # السماح بستايلات وخطوط جوجل (لأن قالب Unfold يستخدمها)
         "style-src": ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         "font-src": ["'self'", "data:", "https://fonts.gstatic.com"],
+        "img-src": ["'self'", "data:", "https://www.gravatar.com"],
         
-        # === التعديل هنا: حذفنا https://* ===
-        # الآن يسمح فقط بالصور من سيرفرك (self) والصور المضمنة (data)
-        "img-src": ["'self'", "data:", "https://www.gravatar.com"], # أضفنا gravatar فقط لأن لوحة الأدمن قد تستخدمها لصور البروفايل (اختياري)
-        
+        # تصحيح الخطأ هنا: جعلناها قائمة عادية بدون تعقيد
         "connect-src": [
             "'self'",
             "ws://localhost:8000",
             "ws://127.0.0.1:8000",
             "ws://host.docker.internal:8000",
+            # إذا كنت تستخدم الموبايل، ضع الـ IP هنا يدوياً
+            "ws://192.168.1.50:8000", 
         ],
     }
 }
 
-TEMPLATES = [
-    {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / 'templates'],
-        "APP_DIRS": True,
-        "OPTIONS": {
-            "context_processors": [
-                "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
-            ],
-        },
-    },
-]
-
-
-
-# ==============================================================================
-# 🧠 AZURE OPENAI CONFIGURATION
-# ==============================================================================
-AZURE_OPENAI_ENDPOINT = env('AZURE_OPENAI_ENDPOINT')
-AZURE_OPENAI_KEY = env('AZURE_OPENAI_KEY')
-AZURE_OPENAI_DEPLOYMENT_NAME = env('AZURE_OPENAI_DEPLOYMENT_NAME', default='gpt-4o')
-
-
-
-# ==============================================================================
-# 🎨 UNFOLD THEME SETTINGS (Modern Admin UI)
-# ==============================================================================
+# إعدادات Unfold (كما هي)
 UNFOLD = {
     "SITE_TITLE": "Medical Support System",
     "SITE_HEADER": "Camp Administration",
     "SITE_URL": "/",
-    # "SITE_ICON": lambda request: static("images/logo.png"),
-
-    # 1. الألوان (Teal Medical Palette)
     "COLORS": {
         "primary": {
             "50": "240 253 250",
@@ -315,8 +249,6 @@ UNFOLD = {
             "950": "4 47 46",
         },
     },
-
-    # 2. القائمة الجانبية (Sidebar)
     "SIDEBAR": {
         "show_search": True,
         "show_all_applications": True,
@@ -327,7 +259,7 @@ UNFOLD = {
                 "items": [
                     {
                         "title": _("Live Chat / المحادثات"),
-                        "icon": "forum", # أيقونة forum تظهر بشكل أوضح للشات
+                        "icon": "forum",
                         "link": reverse_lazy("admin:chat_chatsession_changelist"),
                         "permission": lambda request: request.user.is_staff,
                     },
@@ -338,7 +270,6 @@ UNFOLD = {
                     },
                 ],
             },
-            # ... يمكنك إضافة باقي القوائم هنا (مثل المستخدمين)
             {
                 "title": _("Users & Staff"),
                 "separator": True,
@@ -352,21 +283,25 @@ UNFOLD = {
             },
         ],
     },
-
-    # 3. ربط ملفات التصميم الإضافية (هنا الإضافة الجديدة)
-    "STYLES": [
-        lambda request: static("css/admin_sticky.css"),
-    ],
+    "STYLES": [lambda request: static("css/admin_sticky.css")],
 }
 
 
-# ==============================================================================
-# 🐇 CELERY CONFIGURATION
-# ==============================================================================
-# نستخدم Redis كوسيط للرسائل (Broker) وكمخزن للنتائج
-CELERY_BROKER_URL = "redis://redis:6379/0"
-CELERY_RESULT_BACKEND = "redis://redis:6379/0"
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = TIME_ZONE
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True # تفعيل في الإنتاج
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_HTTPONLY = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+
+
+
