@@ -7,6 +7,10 @@ from asgiref.sync import async_to_sync
 from PIL import Image as PilImage # لاستخدام ضغط الصور
 import logging
 import os
+# أضف هذه الاستيرادات في أعلى الملف إذا لم تكن موجودة
+from django.utils import timezone
+from datetime import timedelta
+from django.db.models import Count, Q
 
 logger = logging.getLogger(__name__)
 
@@ -103,3 +107,70 @@ def process_message_ai(message_id):
         logger.error("Message not found")
     except Exception as e:
         logger.error(f"Critical Task Error: {e}")
+
+
+@shared_task
+def check_epidemic_outbreak():
+    from .models import EpidemicAlert, Message # استيراد داخلي
+
+    # 1. تحديد النطاق الزمني (آخر 60 دقيقة)
+    time_threshold = timezone.now() - timedelta(hours=1)
+    
+    # القاموس
+    epidemic_signatures = {
+        "Gastrointestinal (تسمم غذائي)": ["diaré", "oppkast", "kvalme", "magesmerter"],
+        "Respiratory (تنفسي/إنفلونزا)": ["høy feber", "hoste", "tungpustet", "influensa"],
+        "Skin (أمراض جلدية)": ["skabb", "utslett", "intens kløe"],
+    }
+
+    # حد الخطر
+    DANGER_THRESHOLD = 5
+
+    # 2. جلب رسائل اللاجئين في آخر ساعة (بدون فلترة النص في الداتا بيز)
+    recent_messages = Message.objects.filter(
+        timestamp__gte=time_threshold,
+        sender__role='REFUGEE'
+    ).select_related('session') # لتحسين الأداء
+
+    # 3. الفحص اليدوي في الذاكرة (لأن النص مشفر)
+    # سنقوم بإنشاء قاموس لتجميع الحالات: { 'Type': {set of user_ids} }
+    detected_cases = {k: set() for k in epidemic_signatures.keys()}
+
+    for msg in recent_messages:
+        # فك التشفير يتم تلقائياً هنا عند استدعاء الحقل
+        text_content = (msg.text_translated or "").lower() + " " + (msg.ai_analysis or "").lower()
+        
+        for category, keywords in epidemic_signatures.items():
+            for word in keywords:
+                if word in text_content:
+                    # وجدنا عرضاً، نضيف رقم المستخدم (لعدم تكرار نفس الشخص)
+                    detected_cases[category].add(msg.session.refugee.id)
+                    break # وجدنا الكلمة، ننتقل للفئة التالية
+
+    # 4. تسجيل التنبيهات
+    for category, affected_users in detected_cases.items():
+        count = len(affected_users)
+        
+        if count >= DANGER_THRESHOLD:
+            # التحقق من عدم وجود تنبيه حديث لنفس السبب
+            recent_alert = EpidemicAlert.objects.filter(
+                symptom_category=category,
+                timestamp__gte=time_threshold
+            ).exists()
+
+            if not recent_alert:
+                EpidemicAlert.objects.create(
+                    symptom_category=category,
+                    case_count=count
+                )
+                
+                # إشعار للأدمن
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    "admin_notifications",
+                    {
+                        "type": "epidemic_alert",
+                        "category": category,
+                        "count": count
+                    }
+                )

@@ -137,3 +137,26 @@ class TranslationCache(models.Model):
     @staticmethod
     def make_hash(text): return hashlib.sha256(text.strip().lower().encode('utf-8')).hexdigest()
     def __str__(self): return f"{self.source_language}->{self.target_language}"
+
+
+
+# أضف هذا الكلاس في نهاية ملف models.py
+
+class EpidemicAlert(models.Model):
+    """
+    جدول إنذار الأوبئة: يسجل التنبيهات عند تجاوز الحالات للحد الأقصى
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    symptom_category = models.CharField(max_length=100, verbose_name="Possible type of epidemic")
+    case_count = models.IntegerField(verbose_name="Number of cases detected")
+    time_window_hours = models.IntegerField(default=1, verbose_name="Within (hours)")
+    timestamp = models.DateTimeField(auto_now_add=True)
+    
+    # حقل للممرض ليضغط عليه عندما يتخذ إجراء (مثل: تم عزل المرضى)
+    is_acknowledged = models.BooleanField(default=False, verbose_name="Reviewed/Processed")
+
+    class Meta:
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"🚨 ALERT: {self.symptom_category} ({self.case_count} cases)"

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html, mark_safe
-from .models import ChatSession, Message, TranslationCache, DangerKeyword
+from .models import ChatSession, Message, TranslationCache, DangerKeyword , EpidemicAlert
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from unfold.admin import ModelAdmin, TabularInline
@@ -238,3 +238,27 @@ class ChatSessionAdmin(ModelAdmin):
 class TranslationCacheAdmin(ModelAdmin):
     list_display = ('source_language', 'target_language', 'source_text', 'created_at')
     readonly_fields = ('source_hash', 'source_text', 'translated_text')
+
+
+
+
+# الإضافة الجديدة
+@admin.register(EpidemicAlert)
+class EpidemicAlertAdmin(ModelAdmin):
+    list_display = ('alert_badge', 'symptom_category', 'case_count', 'timestamp', 'is_acknowledged')
+    list_filter = ('is_acknowledged', 'timestamp')
+    readonly_fields = ('symptom_category', 'case_count', 'time_window_hours', 'timestamp')
+    
+    def alert_badge(self, obj):
+        if not obj.is_acknowledged:
+            # التصحيح: نستخدم {} ونمرر النص كمتغير ثاني
+            return format_html(
+                '<div class="bg-red-600 text-white font-bold p-2 text-center rounded animate-pulse shadow-lg">{}</div>',
+                '🚨 OUTBREAK DETECTED 🚨'
+            )
+        return format_html(
+            '<div class="bg-gray-400 text-white p-2 text-center rounded">{}</div>',
+            '✅ Handled'
+        )
+    
+    alert_badge.short_description = "Status"

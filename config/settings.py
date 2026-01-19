@@ -187,6 +187,18 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 
+# ... إعدادات Celery السابقة ...
+from celery.schedules import crontab
+
+# جدولة المهام التلقائية (Celery Beat)
+CELERY_BEAT_SCHEDULE = {
+    'epidemic-warning-every-15-minutes': {
+        'task': 'apps.chat.tasks.check_epidemic_outbreak',
+        # يعمل كل 15 دقيقة لمراقبة الوضع بدقة
+        'schedule': crontab(minute='*/15'), 
+    },
+}
+
 # ==============================================================================
 # 🎨 STATIC & MEDIA
 # ==============================================================================
@@ -253,6 +265,19 @@ UNFOLD = {
         "show_search": True,
         "show_all_applications": True,
         "navigation": [
+              # --- الإضافة الجديدة هنا ---
+            {
+                "title": _("Overview / نظرة عامة"),
+                "separator": False,
+                "items": [
+                    {
+                        "title": _("Dashboard / الإحصائيات"),
+                        "icon": "dashboard", # أيقونة الداشبورد
+                        "link": reverse_lazy("custom_dashboard"), # الاسم الذي وضعناه في urls.py
+                    },
+                ],
+            },
+            # ---------------------------
             {
                 "title": _("Medical Operations"),
                 "separator": True,
@@ -284,6 +309,7 @@ UNFOLD = {
         ],
     },
     "STYLES": [lambda request: static("css/admin_sticky.css")],
+     "SITE_URL": "/dashboard/", # الآن عند الضغط على الشعار يذهب للإحصائيات
 }
 
 
