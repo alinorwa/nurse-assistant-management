@@ -7,7 +7,33 @@ from apps.core.dashboard import MedicalDashboardView # استيراد الكلا
 
 urlpatterns = [
     path('admin/logout/', auth_views.LogoutView.as_view(next_page='/admin/'), name='admin_logout'),
+     path('admin/login/', auth_views.LoginView.as_view(
+        template_name='admin/login.html',  # هنا نحدد ملفنا المصمم
+        extra_context={                    # نمرر العنوان ليظهر في الصفحة
+            'site_title': 'Medical Support System',
+            'site_header': 'Camp Administration',
+        }
+    ), name='admin_login'),
     path('admin/', admin.site.urls),
+     path('reset_password/', 
+         auth_views.PasswordResetView.as_view(template_name="accounts/reset_password.html"), 
+         name='password_reset'),
+
+    # 2. رسالة "تم الإرسال"
+    path('reset_password_sent/', 
+         auth_views.PasswordResetDoneView.as_view(template_name="accounts/reset_password_done.html"), 
+         name='password_reset_done'),
+
+    # 3. الرابط الذي يضغط عليه في الإيميل (يحتوي على uid و token)
+    path('reset/<uidb64>/<token>/', 
+         auth_views.PasswordResetConfirmView.as_view(template_name="accounts/reset_password_confirm.html"), 
+         name='password_reset_confirm'),
+
+    # 4. رسالة "تم التغيير بنجاح"
+    path('reset_password_complete/', 
+         auth_views.PasswordResetCompleteView.as_view(template_name="accounts/reset_password_complete.html"), 
+         name='password_reset_complete'),
+
      path('dashboard/', MedicalDashboardView.as_view(), name='custom_dashboard'),
     
     # الروابط الأساسية للموقع (ويب فقط)

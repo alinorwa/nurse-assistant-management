@@ -42,3 +42,7 @@ django-unfold
 
 celery>=5.3.6
 
+django-import-export
+
+
+openpyxl

@@ -72,15 +72,12 @@
         const langData = JSON.parse(document.getElementById('lang-data').textContent);
         const epidemicData = JSON.parse(document.getElementById('epidemic-data').textContent);
 
-        // إعدادات مشتركة لتصغير الحجم (Responsive)
+        // إعدادات عامة
         const commonOptions = {
             responsive: true,
-            maintainAspectRatio: false, // هذا الخيار يسمح للرسم بالتمدد ليملأ الحاوية الصغيرة فقط
+            maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: { boxWidth: 10, font: { size: 10 } }
-                }
+                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }
             }
         };
 
@@ -91,12 +88,20 @@
         if (langData.options) Object.assign(langData.options, commonOptions);
         else langData.options = commonOptions;
 
-        if (epidemicData.options) Object.assign(epidemicData.options, commonOptions);
-        else epidemicData.options = commonOptions;
+        // للأوبئة: نستخدم الإعدادات القادمة من السيرفر (لأن فيها Stacked) ونضيف عليها الـ Common
+        const finalEpidemicOptions = { 
+            ...commonOptions, 
+            ...epidemicData.options, 
+            scales: { x: { stacked: true }, y: { stacked: true } } 
+        };
 
         new Chart(document.getElementById('activityChart'), activityData);
         new Chart(document.getElementById('langChart'), langData);
-        new Chart(document.getElementById('epidemicChart'), epidemicData);
+        new Chart(document.getElementById('epidemicChart'), {
+            type: 'bar',
+            data: epidemicData.data,
+            options: finalEpidemicOptions
+        });
     });
 </script>
 {% endblock %}

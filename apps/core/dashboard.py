@@ -1,7 +1,7 @@
 from django.views.generic import TemplateView
 from django.contrib.admin.views.decorators import staff_member_required
 from django.utils.decorators import method_decorator
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Case, When, IntegerField
 from django.db.models.functions import TruncDay
 from django.utils import timezone
 from datetime import timedelta
@@ -19,8 +19,8 @@ class MedicalDashboardView(TemplateView):
         context = super().get_context_data(**kwargs)
         
         # إعدادات العناوين لقالب Unfold
-        context['title'] = "Medical Analytics / التحليل الطبي"
-        context['subtitle'] = "نظرة عامة على حالة المخيم والنشاط اليومي"
+        context['title'] = "Medical Analytics"
+        context['subtitle'] = "An overview of the camp's situation and daily activities"
         
         # 1. إحصائيات اللغات (Pie Chart)
         language_data = User.objects.filter(role='REFUGEE').values('native_language').annotate(total=Count('id'))
@@ -64,7 +64,7 @@ class MedicalDashboardView(TemplateView):
             "data": {
                 "labels": [item['date'].strftime('%Y-%m-%d') for item in daily_sessions],
                 "datasets": [{
-                    "label": "جلسات جديدة",
+                    "label": "New sessions",
                     "data": [item['count'] for item in daily_sessions],
                     "borderColor": "#0ea5e9",
                     "backgroundColor": "rgba(14, 165, 233, 0.1)",
@@ -74,19 +74,42 @@ class MedicalDashboardView(TemplateView):
             }
         }
 
-        # 3. الإنذارات الوبائية (Bar Chart)
-        alerts = EpidemicAlert.objects.values('symptom_category').annotate(total_cases=Sum('case_count'))
-        
+        # 3. الإنذارات الوبائية (Stacked Bar Chart - Active vs Controlled)
+        # نقوم بتجميع البيانات وفصلها حسب حقل is_acknowledged
+        epidemic_stats = EpidemicAlert.objects.values('symptom_category').annotate(
+            active_cases=Sum(
+                Case(When(is_acknowledged=False, then='case_count'), default=0, output_field=IntegerField())
+            ),
+            controlled_cases=Sum(
+                Case(When(is_acknowledged=True, then='case_count'), default=0, output_field=IntegerField())
+            )
+        ).order_by('-active_cases')
+
         context['chart_epidemics'] = {
             "type": "bar",
             "data": {
-                "labels": [item['symptom_category'] for item in alerts],
-                "datasets": [{
-                    "label": "عدد الحالات المشتبه بها",
-                    "data": [item['total_cases'] for item in alerts],
-                    "backgroundColor": "#ef4444",
-                    "borderRadius": 4
-                }]
+                "labels": [item['symptom_category'] for item in epidemic_stats],
+                "datasets": [
+                    {
+                        "label": "Active (Urgent)",
+                        "data": [item['active_cases'] for item in epidemic_stats],
+                        "backgroundColor": "#dc2626", # أحمر للحالات النشطة
+                        "borderRadius": 4,
+                    },
+                    {
+                        "label": "Controlled (Resolved)",
+                        "data": [item['controlled_cases'] for item in epidemic_stats],
+                        "backgroundColor": "#10b981", # أخضر للحالات المنتهية
+                        "borderRadius": 4,
+                    }
+                ]
+            },
+            # نمرر خيارات التكديس هنا ليدمجها ملف الـ HTML
+            "options": {
+                "scales": {
+                    "x": {"stacked": True},
+                    "y": {"stacked": True}
+                }
             }
         }
         

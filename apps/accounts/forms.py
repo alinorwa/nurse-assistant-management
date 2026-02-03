@@ -13,16 +13,17 @@ class RefugeeRegistrationForm(forms.ModelForm):
     # حقول كلمة المرور (للتأكد من التطابق)
     password = forms.CharField(widget=forms.PasswordInput, label="Password")
     confirm_password = forms.CharField(widget=forms.PasswordInput, label="Confirm Password")
+    email = forms.EmailField(label="Email Address", required=True)
     
     # تخصيص حقل اسم المستخدم ليظهر كـ "رقم صحي"
     username = forms.CharField(
-        label="Health Number (الرقم الصحي)",
-        help_text="Must be digits only / أرقام فقط"
+        label="Health Number",
+        help_text="Must be digits only"
     )
 
     class Meta:
         model = User
-        fields = ['username', 'native_language', 'full_name']
+        fields = ['username', 'email', 'native_language', 'full_name']
 
     def clean_username(self):
         """التحقق من أن الرقم الصحي يحتوي على أرقام فقط وغير مكرر"""
@@ -33,6 +34,12 @@ class RefugeeRegistrationForm(forms.ModelForm):
         if User.objects.filter(username=username).exists():
              raise ValidationError("This Health Number is already registered.")
         return username
+    
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if User.objects.filter(email=email).exists():
+            raise ValidationError("This email is already registered.")
+        return email
 
     def clean(self):
         """التحقق من تطابق كلمتي المرور"""

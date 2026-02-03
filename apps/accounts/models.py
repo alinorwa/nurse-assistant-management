@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from django.core.validators import RegexValidator
 
 class CustomUserManager(BaseUserManager):
-    def create_user(self, username, password=None, **extra_fields):
+    def create_user(self, username,email=None, password=None, **extra_fields):
         """
         دالة الإنشاء الأساسية.
         username: سيكون الرقم الصحي للاجئ، أو المعرف الوظيفي للممرض.
@@ -12,12 +12,15 @@ class CustomUserManager(BaseUserManager):
         if not username:
             raise ValueError(_('The Username/ID must be set'))
         
-        user = self.model(username=username, **extra_fields)
+        if email:
+            email = self.normalize_email(email)
+        
+        user = self.model(username=username,email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, username, password, **extra_fields):
+    def create_superuser(self, username, email, password, **extra_fields):
         """
         إنشاء الممرض المسؤول (Admin).
         هنا: username يمكن أن يكون أي اسم أو معرف (نصي).
@@ -30,8 +33,11 @@ class CustomUserManager(BaseUserManager):
 
         if extra_fields.get('is_staff') is not True:
             raise ValueError('Superuser must have is_staff=True.')
+        
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('Superuser must have is_superuser=True.')
 
-        return self.create_user(username, password, **extra_fields)
+        return self.create_user(username,email, password, **extra_fields)
 
 class User(AbstractBaseUser, PermissionsMixin):
     
@@ -70,6 +76,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     )
 
     full_name = models.CharField(max_length=150, verbose_name=_("Full Name"))
+    email = models.EmailField(unique=True, verbose_name=_("Email Address"))
     
     role = models.CharField(max_length=10, choices=Role.choices, default=Role.REFUGEE)
     
@@ -88,7 +95,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     objects = CustomUserManager()
 
     USERNAME_FIELD = 'username'
-    REQUIRED_FIELDS = ['full_name'] # الحقول المطلوبة عند إنشاء Superuser
+    REQUIRED_FIELDS = ['email', 'full_name'] # الحقول المطلوبة عند إنشاء Superuser
 
     def __str__(self):
         return f"{self.full_name} ({self.username})"

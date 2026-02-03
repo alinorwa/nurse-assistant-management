@@ -65,7 +65,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             # --- Throttling (Redis Cache لا يزال Sync فنستخدم Wrapper) ---
             if not user.is_staff:
                 cache_key = f"throttle_user_{user.id}"
-                LIMIT = 30 
+                LIMIT = 10000 
                 PERIOD = 60 
 
                 current_count = await sync_to_async(cache.get_or_set)(cache_key, 0, timeout=PERIOD)

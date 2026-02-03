@@ -64,9 +64,7 @@ class ChatSession(models.Model):
     class Meta: ordering = ['-priority', '-last_activity']
     def __str__(self): return f"Chat: {self.refugee.full_name} ({self.get_priority_display()})"
 
-# =========================================================
-# كلاس الرسالة (التعديل هنا)
-# =========================================================
+
 class Message(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     session = models.ForeignKey(ChatSession, on_delete=models.CASCADE, related_name='messages')
@@ -86,44 +84,20 @@ class Message(models.Model):
         ordering = ['timestamp']
 
     def save(self, *args, **kwargs):
-        # 1. تحديد اللغة
+        # منطق "بيانات" فقط (تحديد اللغة الافتراضية)
         if self.sender_id and not self.language_code:
             self.language_code = self.sender.native_language
 
-        # 2. منطق الممرض (إعادة الحالة للطبيعية)
-        if self.sender_id and self.sender.is_staff:
-            if self.session_id:
-                ChatSession.objects.filter(id=self.session_id).update(priority=1, last_activity=Now())
-
-        # 3. الحفظ الفوري
+        # حفظ نقي (المنطق كله انتقل إلى signals.py)
         super().save(*args, **kwargs)
-        kwargs.pop('force_insert', None)
-
-        # 4. إرسال المهمة لـ Celery
-        # --- التعديل الجوهري هنا ---
-        
-        # الشرط أ: اللاجئ أرسل رسالة أو صورة (تحتاج ترجمة أو تحليل)
-        refugee_needs_processing = (
-            self.sender.role == 'REFUGEE' and (
-                (self.text_original and not self.text_translated) or
-                (self.image and not self.ai_analysis)
-            )
-        )
-
-        # الشرط ب: الممرض أرسل رسالة (تحتاج ترجمة لتصل للاجئ)
-        nurse_needs_translation = (
-            self.sender.is_staff and 
-            self.text_original and 
-            not self.text_translated
-        )
-
-        # إذا تحقق أي من الشرطين، أرسل للمهمة الخلفية
-        if refugee_needs_processing or nurse_needs_translation:
-            from .tasks import process_message_ai
-            transaction.on_commit(lambda: process_message_ai.delay(str(self.id)))
 
     def __str__(self):
         return f"{self.sender.username}: Message"
+
+    
+
+
+
 
 class TranslationCache(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -160,3 +134,25 @@ class EpidemicAlert(models.Model):
 
     def __str__(self):
         return f"🚨 ALERT: {self.symptom_category} ({self.case_count} cases)"
+    
+
+
+
+
+
+class ImageAnalysisCache(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    
+    # البصمة الفريدة
+    image_hash = models.CharField(max_length=64, db_index=True, unique=True)
+    
+    # نسخة من الصورة للمراجعة
+    cached_image = models.ImageField(upload_to='cache_snapshots/%Y/', blank=True, null=True, verbose_name="Snapshot")
+    
+    # التحليل (مشفر)
+    analysis_result = EncryptedTextField()
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Image Hash: {self.image_hash[:10]}..."

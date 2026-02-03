@@ -37,6 +37,9 @@ class CustomUserAdmin(BaseUserAdmin, ModelAdmin):
                 'role',
                 'native_language',
                 # تم حذف password_1 و password_2 لتجنب الخطأ
+                'password1', # حقل الباسورد الأول
+                'password2', # حقل تأكيد الباسورد
+                
             ),
         }),
     )

@@ -44,6 +44,20 @@ function initChat(config) {
         };
     }
 
+    // --- دالة جديدة لتنسيق الوقت (YYYY-MM-DD / HH:MM) ---
+    function formatTime(isoString) {
+        if (!isoString) return "";
+        const date = new Date(isoString);
+        
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+
+        return `${year}-${month}-${day} / ${hours}:${minutes}`;
+    }
+
     // === الدالة الذكية لمعالجة الرسائل (تحديث أو إنشاء) ===
     function handleMessage(data) {
         if (data.type === 'error_alert') {
@@ -51,8 +65,6 @@ function initChat(config) {
             return;
         }
 
-        // 1. البحث عن الرسالة في الشاشة باستخدام ID
-        // (ملاحظة: نحتاج للتأكد أن الـ ID لا يحتوي رموزاً تكسر السلكتور)
         const msgElementId = `msg-${data.id}`;
         let existingMsgDiv = document.getElementById(msgElementId);
 
@@ -65,7 +77,6 @@ function initChat(config) {
             msgClass = "sent";
         } else {
             msgClass = "received";
-            // للممرض فقط
             if (data.sender_id !== currentUserId) { 
                  senderLabel = '<span class="sender-label">Nurse 👩‍⚕️</span>';
             }
@@ -81,20 +92,15 @@ function initChat(config) {
                 </a>
             `;
         } else {
-            // منطق العرض:
-            // - إذا أنا المرسل: أعرض النص الأصلي.
-            // - إذا أنا المستقبل: أعرض المترجم (إذا وجد)، وإلا أعرض مؤشر تحميل أو النص الأصلي مؤقتاً
             let displayText = "";
             
             if (data.sender_id === currentUserId) {
                 displayText = data.text_original;
             } else {
-                // إذا وصلت الترجمة اعرضها، إذا لم تصل بعد (فارغة) اعرض النص الأصلي مؤقتاً أو "جاري الترجمة..."
                 displayText = data.text_translated ? data.text_translated : 
                               (data.text_original ? data.text_original : '<i style="color:#888; font-size:0.8em;">... typing / oversetter ...</i>');
             }
             
-            // حماية XSS
             if (displayText) {
                 displayText = displayText.replace(/</g, "&lt;").replace(/>/g, "&gt;");
             }
@@ -102,18 +108,18 @@ function initChat(config) {
         }
 
         contentHtml = senderLabel + messageBody;
-        const timeHtml = `<span class="time">${data.timestamp}</span>`;
+
+        // 🛑 استخدام دالة تنسيق الوقت هنا
+        const formattedTime = formatTime(data.timestamp);
+        const timeHtml = `<span class="time">${formattedTime}</span>`;
 
         // 2. القرار: تحديث أم إنشاء؟
         if (existingMsgDiv) {
-            // === تحديث رسالة موجودة ===
-            // نحدث المحتوى فقط (مثلاً وصلت الترجمة أو التحليل)
             existingMsgDiv.innerHTML = contentHtml + timeHtml;
-            // يمكن إضافة تأثير بصري بسيط ليعرف المستخدم أنها تحديثت (اختياري)
+            existingMsgDiv.className = `message ${msgClass}`; // تحديث الكلاس أيضاً
         } else {
-            // === إنشاء رسالة جديدة ===
             const msgDiv = document.createElement('div');
-            msgDiv.id = msgElementId; // تعيين ID للرسالة لنعثر عليها لاحقاً
+            msgDiv.id = msgElementId;
             msgDiv.className = 'message ' + msgClass;
             msgDiv.innerHTML = contentHtml + timeHtml;
             
